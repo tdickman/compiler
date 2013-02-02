@@ -1,53 +1,102 @@
-class TokenType(object):
-	reserved = 0
-	identifier = 1
-	string = 2
-	number = 3
-	operator = 4
+from token import *
+from constants import *
 
 class Scanner:
-	# Define types
-	RESERVED = 0
-	IDENTIFIER = 1
-	STRING = 2
-	NUMBER = 3
-	OPERATOR = 4
-	UNKNOWN = 5
-	# Stuff to pre-seed symbol table with
-	reserved_words = {"string", "int", "bool", "float", "global", \
-		"in", "out", "if", "then", "else", "case", "for", \
-		"and", "or", "not", "program", "procedure", "begin", \
-		"return", "end"}
-	identifiers = {":", ";", ",", "+", "-", "*", "/", "(", ")", \
-		"<", "<=", ">", ">=", "!=", "=", ":=", "{", "}"}
-	
 	def __init__(self, fileName):
 		self.fileName = fileName
 		self.curLine = 1
-		self.fileO = open(fileName)
+		self.fileO = open(fileName, 'r')
 		self.lookupTable = {}
 		self.__seedTable()
 	
 	def __getChar(self):
+		self.lastPos = self.fileO.tell()
 		nextChar = self.fileO.read(1)
 		if (nextChar == '\n'):
 			self.curLine = self.curLine + 1
 		return nextChar
 
+	def __returnChar(self):
+		'''Returns a character to the file buffer, so the next __getChar
+		function call returns the previous letter'''
+		self.fileO.seek(self.lastPos)
+
 	def __seedTable(self):
 		'''Seeds the dictionary'''
-		for word in reserved_words:
-			self.lookupTable[word] = RESERVED
-		for identifier in identfiers:
-			self.lookupTable[identifier] = IDENTIFIER
+		for word in c.reserved_words:
+			self.lookupTable[word] = c.RESERVED
+		for identifier in c.operators:
+			self.lookupTable[identifier] = c.OPERATOR
 	
 	def __reportError(self, message):
 		'''Prints out the given error message'''
-		print "Error: " + message
+		print "Line:", self.curLine, "-", message
 
 	def __reportWarning(self, message):
 		print "Warning: " + message
 
 	def getToken(self):
 		'''Returns the next token'''
-		print self.__nextChar()
+		# Begin doing stuff #
+		tokenTxt = ""
+		nextChar = self.__getChar()
+		while 1:
+			# Identifier / Reserved Word
+			if nextChar in c.letter:
+				while (nextChar in c.letter) or (nextChar in c.number) or (nextChar == "_"):
+					tokenTxt += nextChar
+					nextChar = self.__getChar()
+				self.__returnChar()
+				# Add to lookup table
+				if tokenTxt not in self.lookupTable:
+					token = Token(tokenTxt, c.IDENTIFIER)
+					self.lookupTable[tokenTxt] = token
+				else:
+					token = self.lookupTable[tokenTxt]
+				return token
+			elif nextChar == "\"":
+				tokenTxt += nextChar
+				nextChar = self.__getChar()
+				while (nextChar in c.letter) or (nextChar in c.number) or (nextChar in " _,;:.']"):
+					tokenTxt += nextChar
+					nextChar = self.__getChar()
+				if nextChar != "\"":
+					self.__reportError("Improper termination of string.")
+					self.__returnChar()
+					return -1 # Change this...
+				else:
+					tokenTxt += nextChar
+				if tokenTxt not in self.lookupTable:
+					token = Token(tokenTxt, c.STRING)
+					self.lookupTable[tokenTxt] = token
+				else:
+					token = self.lookupTable[tokenTxt]
+				return token
+			elif nextChar in c.number:
+				while (nextChar in c.number) or (nextChar == "_"):
+					tokenTxt += nextChar
+					nextChar = self.__getChar()
+				if (nextChar == "."):
+					tokenTxt += nextChar
+					nextChar = self.__getChar()
+				while (nextChar in c.number) or (nextChar == "_"):
+					tokenTxt += nextChar
+					nextChar = self.__getChar()
+				self.__returnChar()
+				# Add to lookup table
+				if tokenTxt not in self.lookupTable:
+					token = Token(tokenTxt, c.NUMBER)
+					self.lookupTable[tokenTxt] = token
+				else:
+					token = self.lookupTable[tokenTxt]
+				return token
+			#elif (nextChar in c.operators) or (nextChar == "!"):
+			elif nextChar == "\n":
+				print " --- Newline! --- "
+				nextChar = self.__getChar()
+
+
+
+
+
+
