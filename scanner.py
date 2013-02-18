@@ -1,4 +1,3 @@
-from token import *
 from constants import *
 
 class Scanner:
@@ -7,7 +6,7 @@ class Scanner:
 		self.curLine = 1
 		self.fileO = open(fileName, 'r')
 		self.lookupTable = {}
-		self.__seedTable()
+		#self.__seedTable()
 	
 	def __getChar(self):
 		self.lastPos = self.fileO.tell()
@@ -19,6 +18,10 @@ class Scanner:
 	def __returnChar(self):
 		'''Returns a character to the file buffer, so the next __getChar
 		function call returns the previous letter'''
+		self.fileO.seek(self.lastPos)
+		# Check if newline
+		if self.fileO.read(1) == "\n":
+			self.curLine -= 1
 		self.fileO.seek(self.lastPos)
 
 	def __seedTable(self):
@@ -42,18 +45,15 @@ class Scanner:
 		nextChar = self.__getChar()
 		while 1:
 			# Identifier / Reserved Word
-			if nextChar in c.letter:
+			if len(nextChar) == 0:
+				return "EOF"
+			elif nextChar in c.letter:
 				while (nextChar in c.letter) or (nextChar in c.number) or (nextChar == "_"):
 					tokenTxt += nextChar
 					nextChar = self.__getChar()
 				self.__returnChar()
 				# Add to lookup table
-				if tokenTxt not in self.lookupTable:
-					token = Token(tokenTxt, c.IDENTIFIER)
-					self.lookupTable[tokenTxt] = token
-				else:
-					token = self.lookupTable[tokenTxt]
-				return token
+				return (tokenTxt, 'IDENTIFIER')
 			elif nextChar == "\"":
 				tokenTxt += nextChar
 				nextChar = self.__getChar()
@@ -61,17 +61,11 @@ class Scanner:
 					tokenTxt += nextChar
 					nextChar = self.__getChar()
 				if nextChar != "\"":
-					self.__reportError("Improper termination of string.")
 					self.__returnChar()
-					return -1 # Change this...
+					self.__reportError("Improper termination of string.")
 				else:
 					tokenTxt += nextChar
-				if tokenTxt not in self.lookupTable:
-					token = Token(tokenTxt, c.STRING)
-					self.lookupTable[tokenTxt] = token
-				else:
-					token = self.lookupTable[tokenTxt]
-				return token
+				return (tokenTxt, 'STRING')
 			elif nextChar in c.number:
 				while (nextChar in c.number) or (nextChar == "_"):
 					tokenTxt += nextChar
@@ -84,29 +78,32 @@ class Scanner:
 					nextChar = self.__getChar()
 				self.__returnChar()
 				# Add to lookup table
-				if tokenTxt not in self.lookupTable:
-					token = Token(tokenTxt, c.NUMBER)
-					self.lookupTable[tokenTxt] = token
-				else:
-					token = self.lookupTable[tokenTxt]
-				return token
+				return (tokenTxt, 'NUMBER')
 			elif (nextChar in c.operators) or (nextChar == "!"):
 				tokenTxt += nextChar
 				tokenTxt += self.__getChar()
 				# Check if 2 characters match
 				if tokenTxt not in c.operators:
-					tokenTxt = tokenTxt[:-1]
-					self.__returnChar()
-					if tokenTxt == "!":
-						# FAILURE<<<>>><<<>>><<<>>>
-						return -1
-				token = self.lookupTable[tokenTxt]
-				return token
-			elif nextChar == "\n":
-				print " --- Newline! --- "
+					if tokenTxt == "//": # Comment
+						nextChar = self.__getChar()
+						while nextChar != "\n":
+							tokenTxt += nextChar
+							nextChar = self.__getChar()
+						print "Comment: " + tokenTxt
+						tokenTxt = ""
+						nextChar = self.__getChar()
+					else:
+						tokenTxt = tokenTxt[:-1]
+						self.__returnChar()
+						if tokenTxt == "!":
+							# FAILURE<<<>>><<<>>><<<>>>
+							return -1
+				if tokenTxt != "": # Don't return for comments
+					return (tokenTxt, 'OPERATOR')
+			elif (nextChar == "\n") or (nextChar == " ") or (nextChar == "	"):
 				nextChar = self.__getChar()
 			else:
-				print "Unidentified character detected: '" + nextChar + "'"
+				self.__reportError("Unidentified character detected: '" + nextChar + "'")
 				nextChar = self.__getChar()
 
 
