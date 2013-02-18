@@ -48,7 +48,7 @@ class Scanner:
 					nextChar = self.__getChar()
 				self.__returnChar()
 				# Add to lookup table
-				if tokenTxO not in self.lookupTable:
+				if tokenTxt not in self.lookupTable:
 					token = Token(tokenTxt, c.IDENTIFIER)
 					self.lookupTable[tokenTxt] = token
 				else:
