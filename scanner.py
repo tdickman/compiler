@@ -24,9 +24,9 @@ class Scanner:
 	def __seedTable(self):
 		'''Seeds the dictionary'''
 		for word in c.reserved_words:
-			self.lookupTable[word] = c.RESERVED
+			self.lookupTable[word] = Token(word, c.RESERVED)
 		for identifier in c.operators:
-			self.lookupTable[identifier] = c.OPERATOR
+			self.lookupTable[identifier] = Token(word, c.OPERATOR)
 	
 	def __reportError(self, message):
 		'''Prints out the given error message'''
@@ -48,7 +48,7 @@ class Scanner:
 					nextChar = self.__getChar()
 				self.__returnChar()
 				# Add to lookup table
-				if tokenTxt not in self.lookupTable:
+				if tokenTxO not in self.lookupTable:
 					token = Token(tokenTxt, c.IDENTIFIER)
 					self.lookupTable[tokenTxt] = token
 				else:
@@ -90,9 +90,23 @@ class Scanner:
 				else:
 					token = self.lookupTable[tokenTxt]
 				return token
-			#elif (nextChar in c.operators) or (nextChar == "!"):
+			elif (nextChar in c.operators) or (nextChar == "!"):
+				tokenTxt += nextChar
+				tokenTxt += self.__getChar()
+				# Check if 2 characters match
+				if tokenTxt not in c.operators:
+					tokenTxt = tokenTxt[:-1]
+					self.__returnChar()
+					if tokenTxt == "!":
+						# FAILURE<<<>>><<<>>><<<>>>
+						return -1
+				token = self.lookupTable[tokenTxt]
+				return token
 			elif nextChar == "\n":
 				print " --- Newline! --- "
+				nextChar = self.__getChar()
+			else:
+				print "Unidentified character detected: '" + nextChar + "'"
 				nextChar = self.__getChar()
 
 
