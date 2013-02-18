@@ -33,10 +33,10 @@ class Scanner:
 	
 	def __reportError(self, message):
 		'''Prints out the given error message'''
-		print "Line:", self.curLine, "-", message
+		print "ERROR: Line", self.curLine, "-", message
 
 	def __reportWarning(self, message):
-		print "Warning: " + message
+		print "WARNING: Line", self.curLine, "-",  message
 
 	def getToken(self):
 		'''Returns the next token'''
@@ -89,7 +89,7 @@ class Scanner:
 						while nextChar != "\n":
 							tokenTxt += nextChar
 							nextChar = self.__getChar()
-						print "Comment: " + tokenTxt
+						#print "Comment: " + tokenTxt
 						tokenTxt = ""
 						nextChar = self.__getChar()
 					else:
@@ -105,9 +105,3 @@ class Scanner:
 			else:
 				self.__reportError("Unidentified character detected: '" + nextChar + "'")
 				nextChar = self.__getChar()
-
-
-
-
-
-
