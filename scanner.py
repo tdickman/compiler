@@ -63,6 +63,7 @@ class Scanner:
 				if nextChar != "\"":
 					self.__returnChar()
 					self.__reportError("Improper termination of string.")
+					return (tokenTxt, 'UNKNOWN')
 				else:
 					tokenTxt += nextChar
 				return (tokenTxt, 'STRING')
@@ -76,6 +77,10 @@ class Scanner:
 				while (nextChar in c.number) or (nextChar == "_"):
 					tokenTxt += nextChar
 					nextChar = self.__getChar()
+				if (nextChar not in c.operators) and (nextChar not in " \n"):
+					self.__reportError("Invalid number termination")
+					self.__returnChar()
+					return (tokenTxt, 'UNKNOWN')
 				self.__returnChar()
 				# Add to lookup table
 				return (tokenTxt, 'NUMBER')
