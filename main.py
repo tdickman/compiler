@@ -8,18 +8,9 @@ def main():
 	else:
 		print "Usage: python main.py infile.c"
 		sys.exit(0)
-
-	# Initialize the scanner
-	s = Scanner(fileName)
-	while 1:
-		nextToken = s.getToken()
-		if nextToken == -1:
-			print "Token error"
-		elif nextToken == "EOF":
-			print "End of file..."
-			break
-		else:
-			print nextToken
+	# Initialize parser
+	p = Parser(fileName)
+	p.parse()
 
 if __name__ == "__main__":
 	main()
