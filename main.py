@@ -1,5 +1,5 @@
 import sys
-from scanner import *
+from parser import *
 
 def main():
 	# Get the filename from the command line parameters
