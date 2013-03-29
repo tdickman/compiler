@@ -52,8 +52,12 @@ class Scanner:
 					tokenTxt += nextChar
 					nextChar = self.__getChar()
 				self.__returnChar()
-				# Add to lookup table
-				return {'text':tokenTxt, 'type':'IDENTIFIER'}
+				# Add to lookup table ?
+				if tokenTxt in c.reserved_words:
+					tType = 'RESERVED'
+				else:
+					tType = 'IDENTIFIER'
+				return {'text':tokenTxt, 'type':tType}
 			elif nextChar == "\"":
 				tokenTxt += nextChar
 				nextChar = self.__getChar()
