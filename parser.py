@@ -158,6 +158,14 @@ class Parser:
 
 	def expression(self):
 		self.reportError("expression not implemented")
+		if self.nToken['text'] == "not":
+			self.stepToken()
+			if self.arithOp():
+				return True
+			else:
+				self.reportError("arithmetic operation expected after 'not'")
+		else:
+			return self.expression()
 
 	def if_statement(self):
 		if self.nToken['text'] == "if":
