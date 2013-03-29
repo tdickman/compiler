@@ -31,11 +31,11 @@ class Scanner:
 		for identifier in c.operators:
 			self.lookupTable[identifier] = Token(word, c.OPERATOR)
 	
-	def __reportError(self, message):
+	def reportError(self, message):
 		'''Prints out the given error message'''
 		print "ERROR: Line", self.curLine, "-", message
 
-	def __reportWarning(self, message):
+	def reportWarning(self, message):
 		print "WARNING: Line", self.curLine, "-",  message
 
 	def getToken(self):
@@ -53,7 +53,7 @@ class Scanner:
 					nextChar = self.__getChar()
 				self.__returnChar()
 				# Add to lookup table
-				return (tokenTxt, 'IDENTIFIER')
+				return {'text':tokenTxt, 'type':'IDENTIFIER'}
 			elif nextChar == "\"":
 				tokenTxt += nextChar
 				nextChar = self.__getChar()
@@ -62,11 +62,11 @@ class Scanner:
 					nextChar = self.__getChar()
 				if nextChar != "\"":
 					self.__returnChar()
-					self.__reportError("Improper termination of string.")
-					return (tokenTxt, 'UNKNOWN')
+					self.reportError("Improper termination of string.")
+					return {'text':tokenTxt, 'type':'UNKNOWN'}
 				else:
 					tokenTxt += nextChar
-				return (tokenTxt, 'STRING')
+				return {'text':tokenTxt, 'type':'STRING'}
 			elif nextChar in c.number:
 				while (nextChar in c.number) or (nextChar == "_"):
 					tokenTxt += nextChar
@@ -78,12 +78,12 @@ class Scanner:
 					tokenTxt += nextChar
 					nextChar = self.__getChar()
 				if (nextChar not in c.operators) and (nextChar not in " \n"):
-					self.__reportError("Invalid number termination")
+					self.reportError("Invalid number termination")
 					self.__returnChar()
-					return (tokenTxt, 'UNKNOWN')
+					return {'text':tokenTxt, 'type':'UNKNOWN'}
 				self.__returnChar()
 				# Add to lookup table
-				return (tokenTxt, 'NUMBER')
+				return {'text':tokenTxt, 'type':'NUMBER'}
 			elif (nextChar in c.operators) or (nextChar == "!"):
 				tokenTxt += nextChar
 				tokenTxt += self.__getChar()
@@ -104,9 +104,9 @@ class Scanner:
 							# FAILURE<<<>>><<<>>><<<>>>
 							return -1
 				if tokenTxt != "": # Don't return for comments
-					return (tokenTxt, 'OPERATOR')
+					return {'text':tokenTxt, 'type':'OPERATOR'}
 			elif (nextChar == "\n") or (nextChar == " ") or (nextChar == "	"):
 				nextChar = self.__getChar()
 			else:
-				self.__reportError("Unidentified character detected: '" + nextChar + "'")
+				self.reportError("Unidentified character detected: '" + nextChar + "'")
 				nextChar = self.__getChar()
