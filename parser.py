@@ -149,7 +149,6 @@ class Parser:
 		return False
 
 	def expression(self):
-		self.reportError("expression not implemented")
 		if self.arithOp():
 			return True
 		elif self.nToken['text'] == "not":
