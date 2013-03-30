@@ -35,6 +35,10 @@ class Scanner:
 		'''Prints out the given error message'''
 		print "ERROR: Line", self.curLine, "-", message
 
+	def __reportError(self, message):
+		'''Prints out the given error message'''
+		print "Scanner ERROR: Line", self.curLine, "-", message
+
 	def reportWarning(self, message):
 		print "WARNING: Line", self.curLine, "-",  message
 
@@ -66,7 +70,7 @@ class Scanner:
 					nextChar = self.__getChar()
 				if nextChar != "\"":
 					self.__returnChar()
-					self.reportError("Improper termination of string.")
+					self.__reportError("Improper termination of string.")
 					return {'text':tokenTxt, 'type':'UNKNOWN'}
 				else:
 					tokenTxt += nextChar
@@ -82,7 +86,7 @@ class Scanner:
 					tokenTxt += nextChar
 					nextChar = self.__getChar()
 				if (nextChar not in c.operators) and (nextChar not in " \n"):
-					self.reportError("Invalid number termination")
+					self.__reportError("Invalid number termination")
 					self.__returnChar()
 					return {'text':tokenTxt, 'type':'UNKNOWN'}
 				self.__returnChar()
@@ -112,5 +116,5 @@ class Scanner:
 			elif (nextChar == "\n") or (nextChar == " ") or (nextChar == "	"):
 				nextChar = self.__getChar()
 			else:
-				self.reportError("Unidentified character detected: '" + nextChar + "'")
+				self.__reportError("Unidentified character detected: '" + nextChar + "'")
 				nextChar = self.__getChar()

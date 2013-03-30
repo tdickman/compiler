@@ -38,9 +38,10 @@ class Parser:
 			self.expectText(";", "Semicolon expected after declaration")
 		self.stepToken()
 		while self.nToken['text'] != "end":
-			if not self.statement():
+			if self.statement():
+				self.expectText(";", "Semicolon expected after statement")
+			else:
 				self.reportError("Statement expected between begin and end")
-			self.expectText(";", "Semicolon expected after statement")
 		self.stepToken()
 		self.expectText("program", "\"program\" expected after end")
 		return True
@@ -50,7 +51,7 @@ class Parser:
 		'''sbGlobal defines whether or not the declaration should be global or not.'''
 		if sbGlobal:
 			self.expectText("global", "Non-global declaration in global section")
-		if not (self.variable_declaration() or self.procedure_declaration()):
+		if not (self.procedure_declaration() or self.variable_declaration()):
 			self.reportError("Expected procedure or variable declaration")
 			return False
 		return True
@@ -59,6 +60,7 @@ class Parser:
 		return self.procedure_header() and self.procedure_body()
 
 	def procedure_header(self):
+		print "Entering procedure_header"
 		if self.nToken['text'] != "procedure":
 			return False
 		self.stepToken()
@@ -87,8 +89,14 @@ class Parser:
 		return True
 
 	def parameter_list(self):
-		while self.nToken['text'] != ")":
-			self.parameter()
+		if self.parameter():
+			if self.nToken['text'] == ",":
+				self.stepToken()
+				self.parameter()
+			return True
+		else:
+			self.printError("At least one parameter expected in parameter list")
+		return False
 
 	def parameter(self):
 		if self.variable_declaration():
@@ -96,6 +104,7 @@ class Parser:
 		else:
 			return False
 		if (self.nToken['text'] == "in") or (self.nToken['text'] == "out"):
+			self.stepToken()
 			return True
 		else:
 			self.reportError("'in' or 'out' not specified after variable_declaration in parameter")
@@ -111,7 +120,11 @@ class Parser:
 		if ( self.type_mark() and self.identifier() ):
 			if self.nToken['text'] == "[":
 				self.stepToken()
-				return self.array_size() and (self.getNtoken()['text'] == "]")
+				if self.array_size():
+					self.expectText("]", "Expected ']' at end of array declaration")
+					return True
+				else:
+					self.reportError("No array size found")
 			else:
 				return True
 		else:
@@ -121,7 +134,11 @@ class Parser:
 		return self.number()
 
 	def number(self):
-		return (self.getNtoken()['type'] == 'NUMBER')
+		if self.nToken['type'] == 'NUMBER':
+			self.stepToken()
+			return True
+		else:
+			return False
 
 	def statement(self):
 		'''sbGlobal defines whether or not the statement should be global or not.'''
@@ -149,23 +166,32 @@ class Parser:
 		return False
 
 	def expression(self):
-		if self.arithOp():
-			return True
-		elif self.nToken['text'] == "not":
+		if self.nToken['text'] == "not":
 			self.stepToken()
 			if self.arithOp():
-				return True
-			else:
-				self.reportError("Arithmetic operation expected expression")
-		elif self.expression():
-			if self.nToken['text'] in {"&", "|"}:
-				self.stepToken()
-				if self.arithOp():
+				if self.expression1():
 					return True
 				else:
-					self.reportError("arithOp expected after '&' or '|' in expression")
+					self.reportError("Incomplete expression")
 			else:
-				self.reportError("'&' or '|' expected in expression")
+				self.reportError("unterminated 'not' in expression")
+		elif self.arithOp():
+			if self.expression1():
+				return True
+			else:
+				self.reportError("Incomplete expression")
+		return False
+
+	def expression1(self):
+		if self.nToken['text'] in {"&", "|"}:
+			self.stepToken()
+			if self.arithOp():
+				if self.expression1():
+					return True
+			else:
+				self.reportError("Invalid expression")
+		else:
+			return True
 		return False
 
 	def factor(self):
@@ -180,6 +206,7 @@ class Parser:
 			else:
 				self.reportError("Expression expected after '(' in factor")
 		elif self.nToken['text'] == "-":
+			self.stepToken()
 			if (self.name() or self.number()):
 				return True
 			else:
@@ -192,7 +219,7 @@ class Parser:
 
 	def name(self):
 		if self.identifier():
-			if self.nToken() == "[":
+			if self.nToken['text'] == "[":
 				self.stepToken()
 				if self.expression():
 					self.expectText("]", "']' expected after expression in name")
@@ -204,52 +231,72 @@ class Parser:
 		return False
 
 	def term(self):
-		print "Entering term (debugging might be necessary"
 		if self.factor():
-			return True
-		elif self.term():
-			if (self.nToken['text'] == "*") or (self.nToken['text'] == "/"):
-				self.stepToken()
-				if self.factor():
-					return True
-				else:
-					self.reportError("Factor expected after '*' or '/'")
+			if self.term1():
+				return True
 			else:
-				self.reportError("* or / expected after term")
+				self.reportError("")
+		return False
+
+	def term1(self):
+		if self.nToken['text'] in {"*", "/"}:
+			self.stepToken()
+			if self.factor():
+				if self.term1():
+					return True
+			else:
+				self.reportError("Invalid relational operation")
+		else:
+			return True
 		return False
 
 	def relation(self):
 		if self.term():
-			return True
-		elif self.relation():
-			if self.nToken['text'] in {"<", ">=", "<=", ">", "==", "!="}:
-				self.stepToken()
-				if self.term():
-					return True
-				else:
-					self.reportError("Term expected after comparator symbol")
+			if self.relation1():
+				return True
 			else:
-				self.reportError("Comparator expected after term in relation")
+				self.reportError("")
+		return False
+
+	def relation1(self):
+		if self.nToken['text'] in {"<", ">=", "<=", ">", "==", "!="}:
+			self.stepToken()
+			if self.term():
+				if self.relation1():
+					return True
+			else:
+				self.reportError("Invalid relational operation")
+		else:
+			return True
 		return False
 
 	def arithOp(self):
 		if self.relation():
-			return True
-		elif self.arithOp():
-			if self.nToken['text'] in {"+", "-"}:
-				self.stepToken()
-				if self.relation():
-					return True
-				else:
-					self.reportError("Relation expected after '+' or '-' symbol")
+			if self.arithOp1():
+				return True
 			else:
-				self.reportError("'+' or '-' expected after arithOp")
+				self.reportError("")
+		return False
+
+	def arithOp1(self):
+		if self.nToken['text'] in {"+", "-"}:
+			self.stepToken()
+			if self.relation():
+				if self.arithOp1():
+					return True
+			else:
+				self.reportError("Invalid arithmetic operation")
+		else:
+			return True
 		return False
 
 	def if_statement(self):
+		print "Entering if_statement"
 		if self.nToken['text'] == "if":
 			self.stepToken()
+			self.expectText("(", "'(' expected after if in if statement")
 			if self.expression():
+				self.expectText(")", "')' expected in if statement")
 				if self.nToken['text'] == "then":
 					self.stepToken()
 					while self.statement():
@@ -258,8 +305,11 @@ class Parser:
 						self.stepToken()
 						while self.statement():
 							self.expectText(";", "Semi-colon expected after statement in if statement")
+					print "Looking for end in if statement"
 					self.expectText("end", "'end' expected in if statement")
 					self.expectText("if", "'if' expected after end in if statement")
+					return True
+					print "Completing if statement"
 				else:
 					self.reportError("'then' expected after expression in if statement")
 			else:
@@ -268,6 +318,7 @@ class Parser:
 
 	def loop_statement(self):
 		if self.nToken['text'] == "for":
+			self.stepToken()
 			self.expectText("(", "'(' expected after for")
 			if self.identifier() and self.assignment_statement1():
 				self.expectText(";", "semi-colon expected after assignment statement in for loop")
@@ -300,13 +351,17 @@ class Parser:
 				return True
 			else:
 				self.reportError("Please enter argument list or ')' to close procedure call")
-		else:
-			self.reportError("Unterminated procedure call")
 		return False
 
 	def argument_list(self):
-		while self.expression():
-			self.expectText(",", "Comma expected after expression in argument_list")
+		if self.expression():
+			if self.nToken['text'] == ",":
+				self.stepToken()
+				self.expression()
+			return True
+		else:
+			self.printError("At least one expression expected in argument list")
+		return False
 
 	def ruleInt(self):
 		if self.identifier():
@@ -345,11 +400,11 @@ class Parser:
 			return True
 
 	def identifier(self):
-		if self.nToken['type'] != 'IDENTIFIER':
-			return False
-		else:
+		if self.nToken['type'] == 'IDENTIFIER':
 			self.stepToken()
 			return True
+		else:
+			return False
 
 	def reportError(self, errorTxt):
 		self.s.reportError(errorTxt)
