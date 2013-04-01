@@ -61,19 +61,16 @@ class Parser:
 
 	def procedure_header(self):
 		print "Entering procedure_header"
-		if self.nToken['text'] != "procedure":
-			return False
-		self.stepToken()
-		if self.getNToken()['type'] != 'IDENTIFIER':
-			self.reportError("Expected identifier after procedure")
-			return False
-		if self.getNToken()['text'] != "(":
-			self.reportError("Expected '(' after identifier in procedure")
-			return False
-		self.parameter_list()
-		if self.getNToken()['text'] != ")":
-			self.reportError("Expected ')' to close parameter list in procedure")
-			return False
+		if self.nToken['text'] == "procedure":
+			self.stepToken()
+			if self.identifier():
+				self.expectText("(", "Incomplete procedure. Expected '('")
+				self.parameter_list()
+				self.expectText(")", "Incomplete procedure. Expected ')'")
+				return True
+			else:
+				self.reportError("Incomplete procedure")
+		return False
 
 	def procedure_body(self):
 		# Check for declaration (can be 0-n)
@@ -89,46 +86,49 @@ class Parser:
 		return True
 
 	def parameter_list(self):
+		print "Entering parameter_list"
 		if self.parameter():
 			if self.nToken['text'] == ",":
 				self.stepToken()
-				self.parameter()
+				self.parameter_list()
 			return True
 		else:
-			self.printError("At least one parameter expected in parameter list")
+			self.reportError("At least one parameter expected in parameter list")
 		return False
 
 	def parameter(self):
 		if self.variable_declaration():
-			self.stepToken()
-		else:
-			return False
-		if (self.nToken['text'] == "in") or (self.nToken['text'] == "out"):
-			self.stepToken()
-			return True
-		else:
-			self.reportError("'in' or 'out' not specified after variable_declaration in parameter")
-			return False
+			if self.nToken['text'] in {"in", "out"}:
+				self.stepToken()
+				return True
+			else:
+				self.reportError("'in' or 'out' expected after variable declaration in parameter")
+		return False
 
 	def type_mark(self):
 		print "\nEntering type_mark\n"
-		tText = self.getNToken()['text']
-		return (tText == "integer" or "float" or "bool" or "string")
+		if self.nToken['text'] in {"integer", "float", "bool", "string"}:
+			self.stepToken()
+			return True
+		else:
+			return False
 
 	def variable_declaration(self):
 		print "\nEntering variable_declaration\n"
-		if ( self.type_mark() and self.identifier() ):
-			if self.nToken['text'] == "[":
-				self.stepToken()
-				if self.array_size():
-					self.expectText("]", "Expected ']' at end of array declaration")
-					return True
+		if self.type_mark():
+			if self.identifier():
+				if self.nToken['text'] == "[":
+					self.stepToken()
+					if self.array_size():
+						self.expectText("]", "Expected ']' at end of array declaration")
+						return True
+					else:
+						self.reportError("No array size found")
 				else:
-					self.reportError("No array size found")
+					return True
 			else:
-				return True
-		else:
-			return False
+				self.reportError("No identifier after type in variable declaration")
+		return False
 
 	def array_size(self):
 		return self.number()
@@ -150,14 +150,14 @@ class Parser:
 			self.stepToken()
 			if self.expression():
 				self.expectText("]", "No ']' found after ']' in assignment statement")
-				self.expectText("=", "No '=' found in assignment statement")
+				self.expectText(":=", "No ':=' found in assignment statement")
 				if self.expression():
 					return True
 				else:
 					self.reportError("Expected expression after '=' in assignment statement")
 			else:
 				self.reportError("Expected ']' after expression in assignment statement")
-		elif self.nToken['text'] == "=":
+		elif self.nToken['text'] == ":=":
 			self.stepToken()
 			if self.expression():
 				return True
