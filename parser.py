@@ -6,16 +6,34 @@ class Parser:
 		self.s = Scanner(fileName)
 		self.tree = []
 		self.nToken = []
-		self.getNToken()
+		self.resync = False
+		self.stepToken()
 
-	def getNToken(self):
-		self.nToken = self.s.getToken()
-		print self.nToken
-		return self.nToken
+	#def getNToken(self):
+	#	self.nToken = self.s.getToken()
+	#	print self.nToken
+	#	return self.nToken
+
+	def getnToken(self):
+		'''Returns nToken. used instead of nToken to allow for resyncing'''
+		if self.resync:
+			return {'text':'','type':''}
+		else:
+			return self.nToken
+
+	def stepToSemicolon(self):
+		print "Stepping to semicolon"
+		while self.nToken['text'] != ";":
+			self.nToken = self.s.getToken()
+			print self.nToken
 
 	def stepToken(self):
-		self.nToken = self.s.getToken()
-		print self.nToken
+		if self.resync:
+			print "Resyncing. Not stepping"
+		else:
+			self.nToken = self.s.getToken()
+			print self.getnToken()
+
 
 	def parse(self):
 		self.program()
@@ -27,17 +45,18 @@ class Parser:
 	def program_header(self):
 		print "\nEntering program_header\n"
 		self.expectText("program", "\"program\" expected")
-		self.identifier()
+		if not self.identifier():
+			self.reportError("Identifier expected after program")
 		self.expectText("is", "\"is\" expected")
 
 	def program_body(self):
 		print "\nEntering program_body\n"
 		# Check for declaration (can be 0-n)
-		while self.nToken['text'] != "begin":
+		while self.getnToken()['text'] != "begin":
 			self.declaration(True)
 			self.expectText(";", "Semicolon expected after declaration")
 		self.stepToken()
-		while self.nToken['text'] != "end":
+		while self.getnToken()['text'] != "end":
 			if self.statement():
 				self.expectText(";", "Semicolon expected after statement")
 			else:
@@ -61,7 +80,7 @@ class Parser:
 
 	def procedure_header(self):
 		print "Entering procedure_header"
-		if self.nToken['text'] == "procedure":
+		if self.getnToken()['text'] == "procedure":
 			self.stepToken()
 			if self.identifier():
 				self.expectText("(", "Incomplete procedure. Expected '('")
@@ -74,11 +93,11 @@ class Parser:
 
 	def procedure_body(self):
 		# Check for declaration (can be 0-n)
-		while self.nToken['text'] != "begin":
+		while self.getnToken()['text'] != "begin":
 			self.declaration(False)
 			self.expectText(";", "Semicolon expected after declaration")
 		self.stepToken()
-		while self.nToken['text'] != "end":
+		while self.getnToken()['text'] != "end":
 			self.statement()
 			self.expectText(";", "Semicolon expected after statement")
 		self.stepToken()
@@ -88,7 +107,7 @@ class Parser:
 	def parameter_list(self):
 		print "Entering parameter_list"
 		if self.parameter():
-			if self.nToken['text'] == ",":
+			if self.getnToken()['text'] == ",":
 				self.stepToken()
 				self.parameter_list()
 			return True
@@ -98,7 +117,7 @@ class Parser:
 
 	def parameter(self):
 		if self.variable_declaration():
-			if self.nToken['text'] in {"in", "out"}:
+			if self.getnToken()['text'] in {"in", "out"}:
 				self.stepToken()
 				return True
 			else:
@@ -107,7 +126,7 @@ class Parser:
 
 	def type_mark(self):
 		print "\nEntering type_mark\n"
-		if self.nToken['text'] in {"integer", "float", "bool", "string"}:
+		if self.getnToken()['text'] in {"integer", "float", "bool", "string"}:
 			self.stepToken()
 			return True
 		else:
@@ -117,7 +136,7 @@ class Parser:
 		print "\nEntering variable_declaration\n"
 		if self.type_mark():
 			if self.identifier():
-				if self.nToken['text'] == "[":
+				if self.getnToken()['text'] == "[":
 					self.stepToken()
 					if self.array_size():
 						self.expectText("]", "Expected ']' at end of array declaration")
@@ -134,7 +153,7 @@ class Parser:
 		return self.number()
 
 	def number(self):
-		if self.nToken['type'] == 'NUMBER':
+		if self.getnToken()['type'] == 'NUMBER':
 			self.stepToken()
 			return True
 		else:
@@ -146,7 +165,7 @@ class Parser:
 	
 	def assignment_statement1(self):
 		print "Entering assignment_statement"
-		if self.nToken['text'] == "[":
+		if self.getnToken()['text'] == "[":
 			self.stepToken()
 			if self.expression():
 				self.expectText("]", "No ']' found after ']' in assignment statement")
@@ -157,7 +176,7 @@ class Parser:
 					self.reportError("Expected expression after '=' in assignment statement")
 			else:
 				self.reportError("Expected ']' after expression in assignment statement")
-		elif self.nToken['text'] == ":=":
+		elif self.getnToken()['text'] == ":=":
 			self.stepToken()
 			if self.expression():
 				return True
@@ -166,7 +185,7 @@ class Parser:
 		return False
 
 	def expression(self):
-		if self.nToken['text'] == "not":
+		if self.getnToken()['text'] == "not":
 			self.stepToken()
 			if self.arithOp():
 				if self.expression1():
@@ -183,7 +202,7 @@ class Parser:
 		return False
 
 	def expression1(self):
-		if self.nToken['text'] in {"&", "|"}:
+		if self.getnToken()['text'] in {"&", "|"}:
 			self.stepToken()
 			if self.arithOp():
 				if self.expression1():
@@ -195,17 +214,17 @@ class Parser:
 		return False
 
 	def factor(self):
-		if (self.nToken['text'] == "true") or (self.nToken['text'] == "false"):
+		if (self.getnToken()['text'] == "true") or (self.getnToken()['text'] == "false"):
 			self.stepToken()
 			return True
-		elif self.nToken['text'] == "(":
+		elif self.getnToken()['text'] == "(":
 			self.stepToken()
 			if self.expression():
 				self.expectText(")", "')' expected after expression in factor")
 				return True
 			else:
 				self.reportError("Expression expected after '(' in factor")
-		elif self.nToken['text'] == "-":
+		elif self.getnToken()['text'] == "-":
 			self.stepToken()
 			if (self.name() or self.number()):
 				return True
@@ -219,7 +238,7 @@ class Parser:
 
 	def name(self):
 		if self.identifier():
-			if self.nToken['text'] == "[":
+			if self.getnToken()['text'] == "[":
 				self.stepToken()
 				if self.expression():
 					self.expectText("]", "']' expected after expression in name")
@@ -239,7 +258,7 @@ class Parser:
 		return False
 
 	def term1(self):
-		if self.nToken['text'] in {"*", "/"}:
+		if self.getnToken()['text'] in {"*", "/"}:
 			self.stepToken()
 			if self.factor():
 				if self.term1():
@@ -259,7 +278,7 @@ class Parser:
 		return False
 
 	def relation1(self):
-		if self.nToken['text'] in {"<", ">=", "<=", ">", "==", "!="}:
+		if self.getnToken()['text'] in {"<", ">=", "<=", ">", "==", "!="}:
 			self.stepToken()
 			if self.term():
 				if self.relation1():
@@ -279,7 +298,7 @@ class Parser:
 		return False
 
 	def arithOp1(self):
-		if self.nToken['text'] in {"+", "-"}:
+		if self.getnToken()['text'] in {"+", "-"}:
 			self.stepToken()
 			if self.relation():
 				if self.arithOp1():
@@ -292,16 +311,16 @@ class Parser:
 
 	def if_statement(self):
 		print "Entering if_statement"
-		if self.nToken['text'] == "if":
+		if self.getnToken()['text'] == "if":
 			self.stepToken()
 			self.expectText("(", "'(' expected after if in if statement")
 			if self.expression():
 				self.expectText(")", "')' expected in if statement")
-				if self.nToken['text'] == "then":
+				if self.getnToken()['text'] == "then":
 					self.stepToken()
 					while self.statement():
 						self.expectText(";", "Semi-colon expected after statement in if statement")
-					if self.nToken['text'] == "else":
+					if self.getnToken()['text'] == "else":
 						self.stepToken()
 						while self.statement():
 							self.expectText(";", "Semi-colon expected after statement in if statement")
@@ -317,7 +336,7 @@ class Parser:
 		return False
 
 	def loop_statement(self):
-		if self.nToken['text'] == "for":
+		if self.getnToken()['text'] == "for":
 			self.stepToken()
 			self.expectText("(", "'(' expected after for")
 			if self.identifier() and self.assignment_statement1():
@@ -336,14 +355,14 @@ class Parser:
 		return False
 
 	def return_statement(self):
-		if self.nToken['text'] == "return":
+		if self.getnToken()['text'] == "return":
 			self.stepToken()
 			return True
 
 	def procedure_call1(self):
-		if self.nToken['text'] == "(":
+		if self.getnToken()['text'] == "(":
 			self.stepToken()
-			if self.nToken['text'] == ")":
+			if self.getnToken()['text'] == ")":
 				self.stepToken()
 				return True
 			elif self.argument_list():
@@ -355,7 +374,7 @@ class Parser:
 
 	def argument_list(self):
 		if self.expression():
-			if self.nToken['text'] == ",":
+			if self.getnToken()['text'] == ",":
 				self.stepToken()
 				self.expression()
 			return True
@@ -375,14 +394,14 @@ class Parser:
 
 	def checkAndProcede(self, text):
 		'''Checks if the next token text matches the given text, and proceeds if it does'''
-		if self.nToken == text:
+		if self.getnToken() == text:
 			self.stepToken()
 			return True
 		else:
 			return False
 	
 	def string(self):
-		if self.nToken['type'] == 'STRING':
+		if self.getnToken()['type'] == 'STRING':
 			self.stepToken()
 			return True
 		else:
@@ -390,8 +409,17 @@ class Parser:
 
 	def expectText(self, text, errorTxt):
 		'''Checks for the specified text, otherwise throws an error, and returns 0'''
-		if self.nToken['text'] != text:
-			self.stepToken()
+		if self.resync and text == ";":
+			self.stepToSemicolon()
+			print self.nToken
+			self.resync = False
+			print "Completing sync to ;"
+		if self.getnToken()['text'] != text:
+			if text == ";":
+				self.stepToSemicolon()
+				print self.nToken
+			else:
+				self.stepToken()
 			# Throw Error
 			self.reportError(errorTxt)
 			return False
@@ -400,14 +428,19 @@ class Parser:
 			return True
 
 	def identifier(self):
-		if self.nToken['type'] == 'IDENTIFIER':
+		if self.getnToken()['type'] == 'IDENTIFIER':
 			self.stepToken()
 			return True
 		else:
 			return False
 
 	def reportError(self, errorTxt):
-		self.s.reportError(errorTxt)
-		for line in traceback.format_stack():
-			print line.strip()
-		exit()
+		if self.resync:
+			# Ignore error
+			print "Resyncing: Ignoring errors"
+		else:
+			self.resync = True
+			self.s.reportError(errorTxt)
+			#for line in traceback.format_stack():
+			#	print line.strip()
+		#exit()
