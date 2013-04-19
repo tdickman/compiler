@@ -1,6 +1,44 @@
 from scanner import *
 import traceback, sys
 
+class SymbolTable:
+	def __init__(self):
+		self.table = []
+
+	def push(self):
+		'''Adds an level to the symbol table'''
+		self.table.append([])
+
+	def pop(self):
+		'''Removes a level from the symbol table, and removes all entries from the current level'''
+		self.table.pop()
+
+	def addItem(self, token, aType):
+		'''Adds the given token to the symbol table at the 
+		current level, and sets the type to the given type'''
+		token['type'] = aType
+		self.table[-1:][0].append(token)
+		print token['text'] + " added to symbol table"
+
+	def __getType(self, token):
+		'''Returns type of the given token'''
+		for level in self.table:
+			for item in level:
+				if item['text'] == token['text']:
+					return item['type']
+		return False
+
+	def checkType(self, token, expectedType):
+		'''Checks to make sure the given token is of the expected type'''
+		tType = self.__getType(token)
+		if not tType:
+			print "Undeclared variable, " + token['text']
+			return False
+		if self.__getType(token) != expectedType:
+			print "Type error, expected '" + expectedType + "' for " + token['text']
+			return False
+		return True
+
 class Parser:
 	def __init__(self, fileName):
 		self.s = Scanner(fileName)
@@ -8,6 +46,7 @@ class Parser:
 		self.nToken = []
 		self.resync = False
 		self.stepToken()
+		self.symTable = SymbolTable()
 
 	#def getNToken(self):
 	#	self.nToken = self.s.getToken()
@@ -39,8 +78,10 @@ class Parser:
 		self.program()
 
 	def program(self):
+		self.symTable.push()
 		self.program_header()
 		self.program_body()
+		self.symTable.pop()
 
 	def program_header(self):
 		print "\nEntering program_header\n"
@@ -126,16 +167,20 @@ class Parser:
 
 	def type_mark(self):
 		print "\nEntering type_mark\n"
-		if self.getnToken()['text'] in {"integer", "float", "bool", "string"}:
+		token = self.getnToken()
+		if token['text'] in {"integer", "float", "bool", "string"}:
 			self.stepToken()
-			return True
+			return token
 		else:
 			return False
 
 	def variable_declaration(self):
 		print "\nEntering variable_declaration\n"
-		if self.type_mark():
-			if self.identifier():
+		aType = self.type_mark()
+		if aType:
+			aIdentifier = self.identifier()
+			if aIdentifier:
+				self.symTable.addItem(aIdentifier, aType['type'])
 				if self.getnToken()['text'] == "[":
 					self.stepToken()
 					if self.array_size():
@@ -428,9 +473,10 @@ class Parser:
 			return True
 
 	def identifier(self):
-		if self.getnToken()['type'] == 'IDENTIFIER':
+		token = self.getnToken()
+		if token['type'] == 'IDENTIFIER':
 			self.stepToken()
-			return True
+			return token
 		else:
 			return False
 
