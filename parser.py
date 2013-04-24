@@ -16,9 +16,15 @@ class SymbolTable:
 	def addItem(self, token, aType):
 		'''Adds the given token to the symbol table at the 
 		current level, and sets the type to the given type'''
+		# Make sure variable does not already exist in the current scope
+		for item in self.table[-1]:
+			if item['text'] == token['text']:
+				print "Token error, '" + token['text']  + "' already declared in this scope"
+				return False
 		token['type'] = aType
-		self.table[-1:][0].append(token)
+		self.table[-1].append(token)
 		print token['text'] + " added to symbol table"
+		return True
 
 	def __getType(self, token):
 		'''Returns type of the given token'''
@@ -78,10 +84,8 @@ class Parser:
 		self.program()
 
 	def program(self):
-		self.symTable.push()
 		self.program_header()
 		self.program_body()
-		self.symTable.pop()
 
 	def program_header(self):
 		print "\nEntering program_header\n"
@@ -91,6 +95,7 @@ class Parser:
 		self.expectText("is", "\"is\" expected")
 
 	def program_body(self):
+		self.symTable.push()
 		print "\nEntering program_body\n"
 		# Check for declaration (can be 0-n)
 		while self.getnToken()['text'] != "begin":
@@ -104,6 +109,7 @@ class Parser:
 				self.reportError("Statement expected between begin and end")
 		self.stepToken()
 		self.expectText("program", "\"program\" expected after end")
+		self.symTable.pop()
 		return True
 
 	def declaration(self, sbGlobal):
@@ -117,7 +123,10 @@ class Parser:
 		return True
 
 	def procedure_declaration(self):
-		return self.procedure_header() and self.procedure_body()
+		self.symTable.push()
+		result = self.procedure_header() and self.procedure_body()
+		self.symTable.pop()
+		return result
 
 	def procedure_header(self):
 		print "Entering procedure_header"
