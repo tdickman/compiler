@@ -2,8 +2,10 @@ from scanner import *
 import traceback, sys
 
 class SymbolTable:
-	def __init__(self):
+	def __init__(self, errorReporter):
+		self.reportError = errorReporter
 		self.table = []
+		self.gTable = []
 
 	def push(self):
 		'''Adds an level to the symbol table'''
@@ -13,46 +15,66 @@ class SymbolTable:
 		'''Removes a level from the symbol table, and removes all entries from the current level'''
 		self.table.pop()
 
-	def addItem(self, token, aType):
+	def addItem(self, token, aType, aGlobal):
 		'''Adds the given token to the symbol table at the 
 		current level, and sets the type to the given type'''
+		if aGlobal:
+			scope = self.gTable
+		else:
+			scope = self.table[-1]
 		# Make sure variable does not already exist in the current scope
-		for item in self.table[-1]:
+		for item in scope:
 			if item['text'] == token['text']:
-				print "Token error, '" + token['text']  + "' already declared in this scope"
+				self.reportError("Token error, '" + token['text']  + "' already declared in this scope")
 				return False
-		token['type'] = aType
-		self.table[-1].append(token)
+		token['type'] = aType.upper()
+		scope.append(token)
 		print token['text'] + " added to symbol table"
+		self.printScope()
 		return True
 
-	def __getType(self, token):
+	def getType(self, token):
 		'''Returns type of the given token'''
-		for level in self.table:
-			for item in level:
-				if item['text'] == token['text']:
-					return item['type']
+		# Check current scope and global scope only
+		for item in self.gTable:
+			if item['text'] == token['text']:
+				return item['type']
+		for item in self.table[-1]:
+			if item['text'] == token['text']:
+				return item['type']
 		return False
 
 	def checkType(self, token, expectedType):
 		'''Checks to make sure the given token is of the expected type'''
-		tType = self.__getType(token)
+		tType = self.getType(token)
 		if not tType:
-			print "Undeclared variable, " + token['text']
+			self.reportError("Undeclared variable, " + token['text'])
+			while True:
+				pass
 			return False
-		if self.__getType(token) != expectedType:
-			print "Type error, expected '" + expectedType + "' for " + token['text']
+		if self.getType(token) != expectedType:
+			self.reportError("Type error, expected '" + expectedType + "' for " + token['text'])
 			return False
 		return True
 
+	def printScope(self):
+		'''Prints all tokens in the current scope. Used
+		for debugging'''
+		print "-------------------- Scope -----------------"
+		print self.table[-1]
+		print "Global:"
+		print self.gTable
+
 class Parser:
 	def __init__(self, fileName):
+		self.errorCount = 0
 		self.s = Scanner(fileName)
 		self.tree = []
 		self.nToken = []
 		self.resync = False
 		self.stepToken()
-		self.symTable = SymbolTable()
+		self.symTable = SymbolTable(self.reportError)
+		self.expressionType = False   # Stores type of expression for type comparison
 
 	#def getNToken(self):
 	#	self.nToken = self.s.getToken()
@@ -86,6 +108,7 @@ class Parser:
 	def program(self):
 		self.program_header()
 		self.program_body()
+		print "Parsing complete.", self.errorCount, "error(s)."
 
 	def program_header(self):
 		print "\nEntering program_header\n"
@@ -102,37 +125,47 @@ class Parser:
 			self.declaration(True)
 			self.expectText(";", "Semicolon expected after declaration")
 		self.stepToken()
-		while self.getnToken()['text'] != "end":
-			if self.statement():
-				self.expectText(";", "Semicolon expected after statement")
-			else:
-				self.reportError("Statement expected between begin and end")
+		#while self.getnToken()['text'] != "end":
+		#	if self.statement():
+		#		self.expectText(";", "Semicolon expected after statement")
+		#	else:
+		#		self.reportError("Statement expected between begin and end")
+		while self.statement():
+			self.expectText(";", "Semicolon expected after statement")
+		self.expectText("end", "\"end\" expected after statements")
 		self.stepToken()
 		self.expectText("program", "\"program\" expected after end")
 		self.symTable.pop()
 		return True
 
-	def declaration(self, sbGlobal):
+	def declaration(self, cbGlobal):
 		print "\nEntering declaration\n"
-		'''sbGlobal defines whether or not the declaration should be global or not.'''
-		if sbGlobal:
-			self.expectText("global", "Non-global declaration in global section")
-		if not (self.procedure_declaration() or self.variable_declaration()):
+		'''cbGlobal defines whether or not the declaration can be global or not.'''
+		isGlobal = False
+		if self.getnToken()['text'] == "global":
+			if cbGlobal:
+				self.stepToken()
+				isGlobal = True
+			else:
+				self.reportError("Global declaration in non-global part")
+		if not (self.procedure_declaration(isGlobal) or self.variable_declaration(isGlobal)):
 			self.reportError("Expected procedure or variable declaration")
 			return False
 		return True
 
-	def procedure_declaration(self):
+	def procedure_declaration(self, isGlobal):
 		self.symTable.push()
-		result = self.procedure_header() and self.procedure_body()
+		result = self.procedure_header(isGlobal) and self.procedure_body()
 		self.symTable.pop()
 		return result
 
-	def procedure_header(self):
+	def procedure_header(self, isGlobal):
 		print "Entering procedure_header"
 		if self.getnToken()['text'] == "procedure":
 			self.stepToken()
-			if self.identifier():
+			token = self.identifier()
+			if token:
+				self.symTable.addItem(token, 'PROCEDURE', isGlobal)
 				self.expectText("(", "Incomplete procedure. Expected '('")
 				self.parameter_list()
 				self.expectText(")", "Incomplete procedure. Expected ')'")
@@ -179,17 +212,17 @@ class Parser:
 		token = self.getnToken()
 		if token['text'] in {"integer", "float", "bool", "string"}:
 			self.stepToken()
-			return token
+			return token['text']
 		else:
 			return False
 
-	def variable_declaration(self):
+	def variable_declaration(self, isGlobal=False):
 		print "\nEntering variable_declaration\n"
 		aType = self.type_mark()
 		if aType:
 			aIdentifier = self.identifier()
 			if aIdentifier:
-				self.symTable.addItem(aIdentifier, aType['type'])
+				self.symTable.addItem(aIdentifier, aType, isGlobal)
 				if self.getnToken()['text'] == "[":
 					self.stepToken()
 					if self.array_size():
@@ -208,6 +241,7 @@ class Parser:
 
 	def number(self):
 		if self.getnToken()['type'] == 'NUMBER':
+			self.expCheckType( self.getnToken() )
 			self.stepToken()
 			return True
 		else:
@@ -239,6 +273,7 @@ class Parser:
 		return False
 
 	def expression(self):
+		self.expressionType = False
 		if self.getnToken()['text'] == "not":
 			self.stepToken()
 			if self.arithOp():
@@ -269,6 +304,7 @@ class Parser:
 
 	def factor(self):
 		if (self.getnToken()['text'] == "true") or (self.getnToken()['text'] == "false"):
+			self.expCheckType(self.getnToken())
 			self.stepToken()
 			return True
 		elif self.getnToken()['text'] == "(":
@@ -291,7 +327,9 @@ class Parser:
 		return False
 
 	def name(self):
-		if self.identifier():
+		token = self.identifier()
+		if token:
+			self.expCheckType(token)
 			if self.getnToken()['text'] == "[":
 				self.stepToken()
 				if self.expression():
@@ -362,6 +400,11 @@ class Parser:
 		else:
 			return True
 		return False
+
+	def expCheckType(self, token):
+		if not self.expressionType:
+			self.expressionType = self.symTable.getType(token)
+		self.symTable.checkType(token, self.expressionType)
 
 	def if_statement(self):
 		print "Entering if_statement"
@@ -456,6 +499,7 @@ class Parser:
 	
 	def string(self):
 		if self.getnToken()['type'] == 'STRING':
+			self.expCheckType( self.getnToken() )
 			self.stepToken()
 			return True
 		else:
@@ -490,6 +534,7 @@ class Parser:
 			return False
 
 	def reportError(self, errorTxt):
+		self.errorCount += 1
 		if self.resync:
 			# Ignore error
 			print "Resyncing: Ignoring errors"
