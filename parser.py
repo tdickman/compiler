@@ -15,9 +15,11 @@ class SymbolTable:
 		'''Removes a level from the symbol table, and removes all entries from the current level'''
 		self.table.pop()
 
-	def addItem(self, token, aType, aGlobal):
+	def addItem(self, token, aType, aGlobal, val=False):
 		'''Adds the given token to the symbol table at the 
-		current level, and sets the type to the given type'''
+		current level, and sets the type to the given type.
+		var=True for a variable name, False for a variable
+		value.'''
 		if aGlobal:
 			scope = self.gTable
 		else:
@@ -28,6 +30,7 @@ class SymbolTable:
 				self.reportError("Token error, '" + token['text']  + "' already declared in this scope")
 				return False
 		token['type'] = aType.upper()
+		token['val'] = val
 		scope.append(token)
 		print token['text'] + " added to symbol table"
 		self.printScope()
@@ -36,6 +39,8 @@ class SymbolTable:
 	def getType(self, token):
 		'''Returns type of the given token'''
 		# Check current scope and global scope only
+		if token['type'] != 'IDENTIFIER':
+			return token['type']
 		for item in self.gTable:
 			if item['text'] == token['text']:
 				return item['type']
@@ -43,14 +48,15 @@ class SymbolTable:
 			if item['text'] == token['text']:
 				return item['type']
 		return False
+		#return token['type'] # Change this back - return type if not in table
 
 	def checkType(self, token, expectedType):
 		'''Checks to make sure the given token is of the expected type'''
-		tType = self.getType(token)
+		#tType = self.getType(token)
+		tType = token['type']
 		if not tType:
 			self.reportError("Undeclared variable, " + token['text'])
-			while True:
-				pass
+			while True: pass
 			return False
 		if self.getType(token) != expectedType:
 			self.reportError("Type error, expected '" + expectedType + "' for " + token['text'])
@@ -133,7 +139,7 @@ class Parser:
 		while self.statement():
 			self.expectText(";", "Semicolon expected after statement")
 		self.expectText("end", "\"end\" expected after statements")
-		self.stepToken()
+		#self.stepToken()
 		self.expectText("program", "\"program\" expected after end")
 		self.symTable.pop()
 		return True
@@ -243,7 +249,7 @@ class Parser:
 		if self.getnToken()['type'] == 'NUMBER':
 			self.expCheckType( self.getnToken() )
 			self.stepToken()
-			return True
+			return 'NUMBER'
 		else:
 			return False
 
@@ -402,8 +408,9 @@ class Parser:
 		return False
 
 	def expCheckType(self, token):
-		if not self.expressionType:
+		if self.expressionType == False:
 			self.expressionType = self.symTable.getType(token)
+		print "Checking if " + str(token) + " is of type " + str(self.expressionType)
 		self.symTable.checkType(token, self.expressionType)
 
 	def if_statement(self):
@@ -501,7 +508,7 @@ class Parser:
 		if self.getnToken()['type'] == 'STRING':
 			self.expCheckType( self.getnToken() )
 			self.stepToken()
-			return True
+			return 'STRING'
 		else:
 			return False
 
@@ -534,11 +541,11 @@ class Parser:
 			return False
 
 	def reportError(self, errorTxt):
-		self.errorCount += 1
 		if self.resync:
 			# Ignore error
 			print "Resyncing: Ignoring errors"
 		else:
+			self.errorCount += 1
 			self.resync = True
 			self.s.reportError(errorTxt)
 			#for line in traceback.format_stack():

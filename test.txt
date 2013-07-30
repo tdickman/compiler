@@ -5,13 +5,15 @@ program aProgram is
 	global procedure newProc(integer a in, bool b out)
 	integer f;
 	integer test;
-	integer test;
+	//integer test;
 	begin
 		test := a;
+		b := test;
 		return;
 	end procedure;
 
 	begin
+		aString := 1 + "a";
 		aString := "Testing...";
 		testing[1] := (a * -b) + c*d + f;
 
