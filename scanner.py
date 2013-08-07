@@ -76,12 +76,14 @@ class Scanner:
 					tokenTxt += nextChar
 				return {'text':tokenTxt, 'type':'STRING'}
 			elif nextChar in c.number:
+				numType = 'INTEGER'
 				while (nextChar in c.number) or (nextChar == "_"):
 					tokenTxt += nextChar
 					nextChar = self.__getChar()
 				if (nextChar == "."):
 					tokenTxt += nextChar
 					nextChar = self.__getChar()
+					numType = 'FLOAT'
 				while (nextChar in c.number) or (nextChar == "_"):
 					tokenTxt += nextChar
 					nextChar = self.__getChar()
@@ -91,7 +93,7 @@ class Scanner:
 					return {'text':tokenTxt, 'type':'UNKNOWN'}
 				self.__returnChar()
 				# Add to lookup table
-				return {'text':tokenTxt, 'type':'NUMBER'}
+				return {'text':tokenTxt, 'type':numType}
 			elif (nextChar in c.operators) or (nextChar == "!"):
 				tokenTxt += nextChar
 				tokenTxt += self.__getChar()

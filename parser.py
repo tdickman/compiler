@@ -44,9 +44,10 @@ class SymbolTable:
 		for item in self.gTable:
 			if item['text'] == token['text']:
 				return item['type']
-		for item in self.table[-1]:
-			if item['text'] == token['text']:
-				return item['type']
+		if len(self.table):
+			for item in self.table[-1]:
+				if item['text'] == token['text']:
+					return item['type']
 		return False
 		#return token['type'] # Change this back - return type if not in table
 
@@ -138,6 +139,7 @@ class Parser:
 		#		self.reportError("Statement expected between begin and end")
 		while self.statement():
 			self.expectText(";", "Semicolon expected after statement")
+		print "CHECKING FOR END"
 		self.expectText("end", "\"end\" expected after statements")
 		#self.stepToken()
 		self.expectText("program", "\"program\" expected after end")
@@ -231,11 +233,12 @@ class Parser:
 				self.symTable.addItem(aIdentifier, aType, isGlobal)
 				if self.getnToken()['text'] == "[":
 					self.stepToken()
-					if self.array_size():
+					lType = self.array_size()
+					if lType == 'INTEGER':
 						self.expectText("]", "Expected ']' at end of array declaration")
 						return True
 					else:
-						self.reportError("No array size found")
+						self.reportError("No integer array size found")
 				else:
 					return True
 			else:
@@ -246,10 +249,10 @@ class Parser:
 		return self.number()
 
 	def number(self):
-		if self.getnToken()['type'] == 'NUMBER':
-			self.expCheckType( self.getnToken() )
+		lType = self.getnToken()['type']
+		if lType in {'INTEGER', 'FLOAT'}:
 			self.stepToken()
-			return 'NUMBER'
+			return lType
 		else:
 			return False
 
@@ -264,16 +267,19 @@ class Parser:
 			if self.expression():
 				self.expectText("]", "No ']' found after ']' in assignment statement")
 				self.expectText(":=", "No ':=' found in assignment statement")
-				if self.expression():
-					return True
+				lType = self.expression()
+				if lType:
+					return lType
 				else:
 					self.reportError("Expected expression after '=' in assignment statement")
 			else:
 				self.reportError("Expected ']' after expression in assignment statement")
 		elif self.getnToken()['text'] == ":=":
 			self.stepToken()
-			if self.expression():
-				return True
+			lType = self.expression()
+			print "assignment_statement1 =", lType
+			if lType:
+				return lType
 			else:
 				self.reportError("Expected expression after '=' in assignment statement")
 		return False
@@ -282,129 +288,160 @@ class Parser:
 		self.expressionType = False
 		if self.getnToken()['text'] == "not":
 			self.stepToken()
-			if self.arithOp():
-				if self.expression1():
-					return True
+			lType = self.arithOp()
+			if lType:
+				rType = self.expression1()
+				if rType:
+					# Integers only
+					if not (lType == rType == 'INTEGER'):
+						self.reportError("Non-integer used in expression")
+					return self.compatTypes(lType, rType)
 				else:
-					self.reportError("Incomplete expression")
+					return lType
 			else:
 				self.reportError("unterminated 'not' in expression")
-		elif self.arithOp():
-			if self.expression1():
-				return True
-			else:
-				self.reportError("Incomplete expression")
+		else:
+			lType = self.arithOp()
+			if lType:
+				rType = self.expression1()
+				if rType:
+					if not (lType == rType == 'INTEGER'):
+						self.reportError("Non-integer used in expression")
+					return self.compatTypes(lType, rType)
+				else:
+					print "Expression =", lType
+					return lType
 		return False
 
 	def expression1(self):
 		if self.getnToken()['text'] in {"&", "|"}:
 			self.stepToken()
-			if self.arithOp():
-				if self.expression1():
-					return True
+			lType = self.arithOp()
+			if lType:
+				rType = self.expression1()
+				if rType:
+					return self.compatTypes(lType, rType)
+				else:
+					return lType
 			else:
 				self.reportError("Invalid expression")
-		else:
-			return True
 		return False
 
 	def factor(self):
-		if (self.getnToken()['text'] == "true") or (self.getnToken()['text'] == "false"):
-			self.expCheckType(self.getnToken())
+		nToken = self.getnToken()
+		if (nToken['text'] == "true") or (nToken['text'] == "false"):
 			self.stepToken()
-			return True
-		elif self.getnToken()['text'] == "(":
+			return 'BOOL'
+		elif nToken['text'] == "(":
 			self.stepToken()
-			if self.expression():
+			expr = self.expression()
+			if expr:
 				self.expectText(")", "')' expected after expression in factor")
-				return True
+				return expr
 			else:
 				self.reportError("Expression expected after '(' in factor")
-		elif self.getnToken()['text'] == "-":
+		elif nToken['text'] == "-":
 			self.stepToken()
-			if (self.name() or self.number()):
-				return True
+			nameOrNum = self.name() or self.number()
+			if nameOrNum:
+				return nameOrNum
 			else:
 				self.reportError("- with no name of number following")
-		elif (self.name() or self.number()):
-			return True
-		elif self.string():
-			return True
-		return False
+		return self.name() or self.number() or self.string()
 
 	def name(self):
-		token = self.identifier()
-		if token:
-			self.expCheckType(token)
+		lType = self.identifier()
+		if lType:
 			if self.getnToken()['text'] == "[":
 				self.stepToken()
 				if self.expression():
 					self.expectText("]", "']' expected after expression in name")
-					return True
+					return lType
 				else:
 					self.reportError("Expression expected after '[' in name")
 			else:
-				return True
+				return lType
 		return False
 
 	def term(self):
-		if self.factor():
-			if self.term1():
-				return True
+		print "Entering term"
+		lType = self.factor()
+		if lType:
+			rType = self.term1()
+			if rType:
+				if not (lType and rType in {'INTEGER', 'FLOAT'}):
+					self.reportError("Non-integer/float used in arithmetic operation")
+				return self.compatTypes(lType, rType, 'ARITH')
 			else:
-				self.reportError("")
+				return lType
 		return False
 
 	def term1(self):
 		if self.getnToken()['text'] in {"*", "/"}:
 			self.stepToken()
-			if self.factor():
-				if self.term1():
-					return True
+			lType = self.factor()
+			if lType:
+				rType = self.term1()
+				if rType:
+					if not (lType and rType in {'INTEGER', 'FLOAT'}):
+						self.reportError("Non-integer/float used in arithmetic operation")
+					return self.compatTypes(lType, rType, 'ARITH')
+				else:
+					return lType
 			else:
 				self.reportError("Invalid relational operation")
-		else:
-			return True
 		return False
 
 	def relation(self):
-		if self.term():
-			if self.relation1():
-				return True
+		lType = self.term()
+		if lType:
+			rType = self.relation1()
+			if rType:
+				return self.compatTypes(lType, rType, 'RELATION')
 			else:
-				self.reportError("")
+				return lType
 		return False
 
 	def relation1(self):
 		if self.getnToken()['text'] in {"<", ">=", "<=", ">", "==", "!="}:
 			self.stepToken()
-			if self.term():
-				if self.relation1():
-					return True
+			lType = self.term()
+			if lType:
+				rType = self.relation1()
+				if rType:
+					return self.compatTypes(lType, rType)
+				else:
+					return lType
 			else:
 				self.reportError("Invalid relational operation")
-		else:
-			return True
 		return False
 
 	def arithOp(self):
-		if self.relation():
-			if self.arithOp1():
-				return True
+		lType = self.relation()
+		if lType:
+			rType = self.arithOp1()
+			if rType:
+				if not (lType and rType in {'INTEGER', 'FLOAT'}):
+					self.reportError("Non-integer/float used in arithmetic operation")
+				return self.compatTypes(lType, rType, 'ARITH')
 			else:
-				self.reportError("")
+				return lType
 		return False
 
 	def arithOp1(self):
 		if self.getnToken()['text'] in {"+", "-"}:
 			self.stepToken()
-			if self.relation():
-				if self.arithOp1():
-					return True
+			lType = self.relation()
+			if lType:
+				rType = self.arithOp1()
+				if rType:
+					if not (lType and rType in {'INTEGER', 'FLOAT'}):
+						self.reportError("Non-integer/float used in arithmetic operation")
+					return self.compatTypes(lType, rType, 'ARITH')
+				else:
+					return lType
 			else:
 				self.reportError("Invalid arithmetic operation")
-		else:
-			return True
 		return False
 
 	def expCheckType(self, token):
@@ -418,7 +455,11 @@ class Parser:
 		if self.getnToken()['text'] == "if":
 			self.stepToken()
 			self.expectText("(", "'(' expected after if in if statement")
-			if self.expression():
+			lType = self.expression()
+			if lType:
+				if lType != 'BOOL':
+					self.reportError("Non boolean value used in if statement")
+					return False
 				self.expectText(")", "')' expected in if statement")
 				if self.getnToken()['text'] == "then":
 					self.stepToken()
@@ -443,7 +484,10 @@ class Parser:
 		if self.getnToken()['text'] == "for":
 			self.stepToken()
 			self.expectText("(", "'(' expected after for")
-			if self.identifier() and self.assignment_statement1():
+			lType = self.identifier()
+			rType = self.assignment_statement1()
+			print lType,rType
+			if lType == rType == 'INTEGER':
 				self.expectText(";", "semi-colon expected after assignment statement in for loop")
 				if self.expression():
 					self.expectText(")", "')' expected at end of for loop statement")
@@ -455,7 +499,7 @@ class Parser:
 				else:
 					self.reportError("expression expected after semi-colon in for loop")
 			else:
-				self.reportError("assignment statement expected after '(' in for loop")
+				self.reportError("Non integer loop")
 		return False
 
 	def return_statement(self):
@@ -487,13 +531,17 @@ class Parser:
 		return False
 
 	def ruleInt(self):
-		if self.identifier():
+		lType = self.identifier()
+		if lType:
 			if self.procedure_call1():
 				return True
-			elif self.assignment_statement1():
-				return True
 			else:
-				self.reportError("Assignment statement or procedure call with unknown character after identifier")
+				rType = self.assignment_statement1()
+				if rType:
+					print "Checking assignment types"
+					return self.compatTypes(lType, rType)
+				else:
+					self.reportError("Assignment statement or procedure call with unknown character after identifier")
 		return False
 
 	def checkAndProcede(self, text):
@@ -506,7 +554,6 @@ class Parser:
 	
 	def string(self):
 		if self.getnToken()['type'] == 'STRING':
-			self.expCheckType( self.getnToken() )
 			self.stepToken()
 			return 'STRING'
 		else:
@@ -536,6 +583,9 @@ class Parser:
 		token = self.getnToken()
 		if token['type'] == 'IDENTIFIER':
 			self.stepToken()
+			lType = self.symTable.getType(token) 
+			if lType:
+				return lType
 			return token
 		else:
 			return False
@@ -551,3 +601,22 @@ class Parser:
 			#for line in traceback.format_stack():
 			#	print line.strip()
 		#exit()
+	
+	def compatTypes(self, lType, rType, caller=None):
+		'''Returns whether or not the two passed in types
+		are compatible with each other.'''
+		if caller == 'RELATION':
+			if lType and rType in {'BOOL', 'INTEGER'}:
+				return 'BOOL'
+		if caller == 'ARITH':
+			if lType and rType in {'INTEGER', 'FLOAT'}:
+				return 'FLOAT'
+		if lType == rType:
+			print lType, "==", rType
+			combinedType = lType
+			return combinedType
+		else:
+			traceback.print_stack()
+			print lType, "!=", rType
+			self.reportError("Incompatible types.")
+			return False
