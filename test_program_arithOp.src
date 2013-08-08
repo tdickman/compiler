@@ -1,0 +1,10 @@
+program aProgram is
+	global integer test;
+	global integer test2;
+
+	begin
+		test := 1;
+		test := 1 + 2;
+		test2 := test + 3;
+		return;
+	end program

@@ -1,0 +1,9 @@
+program aProgram is
+	global integer test;
+
+	begin
+		if ( 1 < 2 ) then
+			test := 1;
+		end if;
+		return;
+	end program

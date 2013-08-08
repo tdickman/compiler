@@ -1,0 +1,12 @@
+program aProgram is
+	global integer tInt;
+	global float tFloat;
+
+	begin
+		tInt := 4 & 1;
+		//test := 1 & 2.2;
+		tInt := 1 + 2.2;
+		tInt := 1 * 2.2;
+		tFloat := 1.0 / 2.2;
+		return;
+	end program

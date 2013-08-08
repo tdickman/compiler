@@ -1,0 +1,7 @@
+program aProgram is
+	global bool test;
+
+	begin
+		test := 1 < true;
+		return;
+	end program
