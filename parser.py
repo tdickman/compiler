@@ -394,6 +394,10 @@ class Parser:
 
 	def name(self):
 		token = self.identifier()
+		# Verify identifier has been declared
+		if token:
+			if not self.symTable.getType(token):
+				self.reportError("Undeclared variable '" + token['text'] + "' referenced")
 		if token:
 			lType = token['type']
 			if self.getnToken()['text'] == "[":
