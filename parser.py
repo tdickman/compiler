@@ -1,5 +1,6 @@
 from scanner import *
 import traceback, sys
+import copy
 
 class SymbolTable:
 	def __init__(self, errorReporter):
@@ -46,7 +47,7 @@ class SymbolTable:
 		'''Procedures are a special case - added up one
 		layer so they are properly accessible. Parameters
 		are also added to them too.'''
-		procToken['parameters'] = self.table[-1]
+		procToken['parameters'] = copy.deepcopy(self.table[-1])
 		procToken['type'] = 'PROCEDURE'
 		self.table[-2].append(procToken)
 
@@ -56,10 +57,16 @@ class SymbolTable:
 		#print "checkProcedure called"
 		# Check if procedure is in scope
 		#print self.table
-		if not self.getToken(procedureToken):
+		if (not self.getToken(procedureToken)) or \
+			len(self.getToken(procedureToken)['parameters']) != len(arguments):
 			self.reportError("Undeclared procedure called")
+			return False
 		# Check if arguments are correct
-		#print self.getToken(procedureToken)
+		for i, token in enumerate(self.getToken(procedureToken)['parameters']):
+			if token['type'] != arguments[i]:
+				self.reportError("Invalid procedure call")
+				return False
+		return True
 	
 	def getToken(self, token):
 		for item in self.gTable:
@@ -320,7 +327,7 @@ class Parser:
 		elif self.getnToken()['text'] == ":=":
 			self.stepToken()
 			lType = self.expression()
-			self.printInfo("assignment_statement1 =" + lType)
+			self.printInfo("assignment_statement1 = " + str(lType))
 			if lType:
 				return lType
 			else:
@@ -347,13 +354,17 @@ class Parser:
 				self.reportError("unterminated 'not' in expression")
 		else:
 			lType = self.arithOp()
+			if self.resync:
+				return True
 			if lType:
 				rType = self.expression1()
 				if rType:
 					return self.compatTypes(lType, rType)
 				else:
-					self.printInfo("Expression = " + lType)
+					self.printInfo("Expression = " + str(lType))
 					return lType
+		if self.resync:
+			return True
 		return False
 
 	def expression1(self):
@@ -398,6 +409,7 @@ class Parser:
 		if token:
 			if not self.symTable.getType(token):
 				self.reportError("Undeclared variable '" + token['text'] + "' referenced")
+				return True
 		if token:
 			lType = token['type']
 			if self.getnToken()['text'] == "[":
@@ -414,6 +426,8 @@ class Parser:
 	def term(self):
 		self.printInfo("Entering term")
 		lType = self.factor()
+		if self.resync:
+			return True
 		if lType:
 			rType = self.term1()
 			if rType:
@@ -442,6 +456,8 @@ class Parser:
 
 	def relation(self):
 		lType = self.term()
+		if self.resync:
+			return True
 		if lType:
 			rType = self.relation1()
 			if rType:
@@ -466,6 +482,8 @@ class Parser:
 
 	def arithOp(self):
 		lType = self.relation()
+		if self.resync:
+			return True
 		if lType:
 			rType = self.arithOp1()
 			if rType:
@@ -534,6 +552,9 @@ class Parser:
 			self.expectText("(", "'(' expected after for")
 			token = self.identifier()
 			if token:
+				if not self.symTable.getType(token):
+					self.reportError("Undeclared variable '" + token['text'] + "' referenced")
+					return False
 				lType = token['type']
 			rType = self.assignment_statement1()
 			self.printInfo(lType + " " + rType)
@@ -549,7 +570,7 @@ class Parser:
 				else:
 					self.reportError("expression expected after semi-colon in for loop")
 			else:
-				self.reportError("Non integer loop")
+				self.reportError("Non-integer loop")
 		return False
 
 	def return_statement(self):
@@ -607,6 +628,8 @@ class Parser:
 				return True
 			else:
 				rType = self.assignment_statement1()
+				if self.resync:
+					return True
 				if rType:
 					self.printInfo("Checking assignment types")
 					return self.compatTypes(lType, rType)
@@ -631,7 +654,7 @@ class Parser:
 
 	def expectText(self, text, errorTxt):
 		'''Checks for the specified text, otherwise throws an error, and returns 0'''
-		if self.resync and text == ";":
+		if self.resync and (text == ";"):
 			self.stepToSemicolon()
 			self.printInfo(self.nToken)
 			self.resync = False
@@ -669,8 +692,7 @@ class Parser:
 			self.errorCount += 1
 			self.resync = True
 			self.s.reportError(errorTxt)
-			#for line in traceback.format_stack():
-			#	print line.strip()
+			#traceback.print_stack()
 		#exit()
 	
 	def printInfo(self, message):
@@ -691,6 +713,6 @@ class Parser:
 				return 'INTEGER'
 		else:
 			#traceback.print_stack()
-			self.printInfo(lType + "!=" + rType)
+			self.printInfo( str(lType) + "!=" + str(rType) )
 			self.reportError("Incompatible types.")
 			return False

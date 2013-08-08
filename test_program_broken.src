@@ -1,6 +1,8 @@
 program test is
 	global integer test;
+	global integer test2;
 	global string aString;
+	global bool aBool;
 
 	global procedure newProc(integer a in, bool b out)
 	integer test;
@@ -11,21 +13,20 @@ program test is
 
 	begin
 		aString := "Testing...";
-		testing[1] := (a * -b) + c*d + f;
+		test := (a * -b) + c*d + f;
+		aString := "a";
 
 		// if statement
 		if ( true ) then
-			testing[2+a] := a/b;
-		else
-			testing[2] := a*b;
+			test := false;
 		end if;
 
 		// for statement
-		for (a := 0; a<=10)
-			a := a+1;
-			testing[a] := a+1;
+		for (test2 := 0; test2<=10)
+			test := test+1;
 		end for;
 
-		newProc(2, b);
+		newProc(2, aBool);
+		newProc(2);
 		return;
 	end program
