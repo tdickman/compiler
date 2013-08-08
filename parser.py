@@ -19,7 +19,8 @@ class SymbolTable:
 		'''Adds the given token to the symbol table at the 
 		current level, and sets the type to the given type.
 		var=True for a variable name, False for a variable
-		value.'''
+		value. Direction should be set to false for
+		everything except function parameters.'''
 		if aGlobal:
 			scope = self.gTable
 		else:
@@ -36,6 +37,43 @@ class SymbolTable:
 		self.printScope()
 		return True
 
+	def setDirection(self, direction):
+		'''Sets the direction of the perviously inserted
+		variable. Used for procedure parameters.'''
+		self.table[-1][-1]['direction'] = direction
+
+	def addProcedure(self, procToken):
+		'''Procedures are a special case - added up one
+		layer so they are properly accessible. Parameters
+		are also added to them too.'''
+		print "Add procedure called!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+		procToken['parameters'] = self.table[-1]
+		procToken['type'] = 'PROCEDURE'
+		self.table[-2].append(procToken)
+		print self.table
+
+	def checkProcedure(self, procedureToken, arguments):
+		'''Checks whether or not the given procedure
+		call is in scope, and the arguments are correct.'''
+		print "checkProcedure called"
+		# Check if procedure is in scope
+		print self.table
+		if not self.getToken(procedureToken):
+			self.reportError("Undeclared procedure called")
+		# Check if arguments are correct
+		print self.getToken(procedureToken)
+	
+	def getToken(self, token):
+		for item in self.gTable:
+			if item['text'] == token['text']:
+				return item
+		if len(self.table):
+			for row in self.table:
+				for item in row:
+					if item['text'] == token['text']:
+						return item
+		return False
+
 	def getType(self, token):
 		'''Returns type of the given token'''
 		# Check current scope and global scope only
@@ -45,9 +83,10 @@ class SymbolTable:
 			if item['text'] == token['text']:
 				return item['type']
 		if len(self.table):
-			for item in self.table[-1]:
-				if item['text'] == token['text']:
-					return item['type']
+			for row in self.table:
+				for item in row:
+					if item['text'] == token['text']:
+						return item['type']
 		return False
 		#return token['type'] # Change this back - return type if not in table
 
@@ -163,9 +202,12 @@ class Parser:
 
 	def procedure_declaration(self, isGlobal):
 		self.symTable.push()
-		result = self.procedure_header(isGlobal) and self.procedure_body()
+		headerResult = self.procedure_header(isGlobal)
+		if headerResult:
+			self.symTable.addProcedure(headerResult)
+			bodyResult = self.procedure_body()
 		self.symTable.pop()
-		return result
+		return headerResult and bodyResult
 
 	def procedure_header(self, isGlobal):
 		print "Entering procedure_header"
@@ -173,11 +215,11 @@ class Parser:
 			self.stepToken()
 			token = self.identifier()
 			if token:
-				self.symTable.addItem(token, 'PROCEDURE', isGlobal)
+				#self.symTable.addItem(token, 'PROCEDURE', isGlobal)
 				self.expectText("(", "Incomplete procedure. Expected '('")
 				self.parameter_list()
 				self.expectText(")", "Incomplete procedure. Expected ')'")
-				return True
+				return token
 			else:
 				self.reportError("Incomplete procedure")
 		return False
@@ -208,7 +250,9 @@ class Parser:
 
 	def parameter(self):
 		if self.variable_declaration():
-			if self.getnToken()['text'] in {"in", "out"}:
+			direction = self.getnToken()['text']
+			if direction in {"in", "out"}:
+				self.symTable.setDirection(direction)
 				self.stepToken()
 				return True
 			else:
@@ -220,7 +264,7 @@ class Parser:
 		token = self.getnToken()
 		if token['text'] in {"integer", "float", "bool", "string"}:
 			self.stepToken()
-			return token['text']
+			return token['text'].upper()
 		else:
 			return False
 
@@ -293,8 +337,10 @@ class Parser:
 				rType = self.expression1()
 				if rType:
 					# Integers only
-					if not (lType == rType == 'INTEGER'):
-						self.reportError("Non-integer used in expression")
+					if not (lType and rType in {'INTEGER', 'BOOL'}):
+						self.reportError("Non-integer/bool used in expression")
+					if not (lType == rType):
+						self.reportError("Non-matching expression")
 					return self.compatTypes(lType, rType)
 				else:
 					return lType
@@ -305,8 +351,6 @@ class Parser:
 			if lType:
 				rType = self.expression1()
 				if rType:
-					if not (lType == rType == 'INTEGER'):
-						self.reportError("Non-integer used in expression")
 					return self.compatTypes(lType, rType)
 				else:
 					print "Expression =", lType
@@ -350,8 +394,9 @@ class Parser:
 		return self.name() or self.number() or self.string()
 
 	def name(self):
-		lType = self.identifier()
-		if lType:
+		token = self.identifier()
+		if token:
+			lType = token['type']
 			if self.getnToken()['text'] == "[":
 				self.stepToken()
 				if self.expression():
@@ -484,7 +529,9 @@ class Parser:
 		if self.getnToken()['text'] == "for":
 			self.stepToken()
 			self.expectText("(", "'(' expected after for")
-			lType = self.identifier()
+			token = self.identifier()
+			if token:
+				lType = token['type']
 			rType = self.assignment_statement1()
 			print lType,rType
 			if lType == rType == 'INTEGER':
@@ -513,27 +560,48 @@ class Parser:
 			if self.getnToken()['text'] == ")":
 				self.stepToken()
 				return True
-			elif self.argument_list():
-				self.expectText(")", "Can't find ')' for procedure call")
-				return True
 			else:
-				self.reportError("Please enter argument list or ')' to close procedure call")
+				arguments = self.argument_list()
+				if arguments:
+					self.expectText(")", "Can't find ')' for procedure call")
+					return arguments
+				else:
+					self.reportError("Please enter argument list or ')' to close procedure call")
 		return False
 
 	def argument_list(self):
-		if self.expression():
-			if self.getnToken()['text'] == ",":
-				self.stepToken()
-				self.expression()
-			return True
-		else:
-			self.printError("At least one expression expected in argument list")
+		lType = self.expression()
+		if lType:
+			rType = self.argument_list1()
+			if rType:
+				print [lType] + rType
+				return [lType] + rType
+			else:
+				return [lType]
+		return False
+
+	def argument_list1(self):
+		if self.getnToken()['text'] == ",":
+			self.stepToken()
+			lType = self.expression()
+			if lType:
+				rType = self.argument_list1()
+				if rType:
+					return [lType] + rType
+				else:
+					return [lType]
+			else:
+				self.reportError("Incomplete argument list")
 		return False
 
 	def ruleInt(self):
-		lType = self.identifier()
-		if lType:
-			if self.procedure_call1():
+		token = self.identifier()
+		if token:
+			lType = token['type']
+			arguments = self.procedure_call1()
+			if arguments:
+				self.symTable.checkProcedure(token, arguments)
+				self.symTable.checkType(token, 'PROCEDURE')
 				return True
 			else:
 				rType = self.assignment_statement1()
@@ -585,7 +653,7 @@ class Parser:
 			self.stepToken()
 			lType = self.symTable.getType(token) 
 			if lType:
-				return lType
+				return {'text':token['text'], 'type':lType}
 			return token
 		else:
 			return False
@@ -608,13 +676,13 @@ class Parser:
 		if caller == 'RELATION':
 			if lType and rType in {'BOOL', 'INTEGER'}:
 				return 'BOOL'
-		if caller == 'ARITH':
-			if lType and rType in {'INTEGER', 'FLOAT'}:
-				return 'FLOAT'
-		if lType == rType:
+		elif lType == rType:
 			print lType, "==", rType
 			combinedType = lType
 			return combinedType
+		elif caller == 'ARITH':
+			if lType and rType in {'INTEGER', 'FLOAT'}:
+				return 'INTEGER'
 		else:
 			traceback.print_stack()
 			print lType, "!=", rType

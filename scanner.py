@@ -11,7 +11,7 @@ class Scanner:
 	def __getChar(self):
 		self.lastPos = self.fileO.tell()
 		nextChar = self.fileO.read(1)
-		if (nextChar == '\n'):
+		if nextChar == '\n':
 			self.curLine = self.curLine + 1
 		return nextChar
 
@@ -115,8 +115,9 @@ class Scanner:
 							return -1
 				if tokenTxt != "": # Don't return for comments
 					return {'text':tokenTxt, 'type':'OPERATOR'}
-			elif (nextChar == "\n") or (nextChar == " ") or (nextChar == "	"):
+			elif (nextChar == "\n") or (nextChar == " ") or (nextChar == "	") or (nextChar == "\r"):
 				nextChar = self.__getChar()
 			else:
+				nextChar = nextChar.encode('hex')
 				self.__reportError("Unidentified character detected: '" + nextChar + "'")
 				nextChar = self.__getChar()

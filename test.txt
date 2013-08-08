@@ -1,35 +1,39 @@
 program aProgram is
 	global integer test;
 	global string aString;
+	global bool aBool;
 
-	global procedure newProc(integer a in, bool b out)
+	global procedure newProc(integer a in, bool b out, bool c in)
 	integer f;
 	integer test;
 	//integer test;
 	begin
 		test := a;
+		// Next line returns an error
 		b := test;
 		return;
 	end procedure;
 
 	begin
-		aString := 1 + "a";
+		// Next line returns an error
+		//aString := 1 + "a";
 		aString := "Testing...";
 		testing[1] := (a * -b) + c*d + f;
 
 		// if statement
-		if ( true ) then
-			testing[2+a] := a/b;
-		else
-			testing[2] := a*b;
-		end if;
+		//if ( true ) then
+		//	testing[2+a] := a/b;
+		//else
+		//	testing[2] := a*b;
+		//end if;
 
 		// for statement
-		for (a := 0; a<=10)
-			a := a+1;
-			testing[a] := a+1;
-		end for;
+		//for (a := 0; a<=10)
+		//	a := a+1;
+		//	testing[a] := a+1;
+		//end for;
 
-		newProc(2, b);
+		newProc(2, aBool);
+		aString := "b";
 		return;
 	end program
