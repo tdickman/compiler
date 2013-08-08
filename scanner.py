@@ -1,11 +1,12 @@
 from constants import *
 
 class Scanner:
-	def __init__(self, fileName):
+	def __init__(self, fileName, verbose=False):
 		self.fileName = fileName
 		self.curLine = 1
 		self.fileO = open(fileName, 'r')
 		self.lookupTable = {}
+		self.verbose = verbose
 		#self.__seedTable()
 	
 	def __getChar(self):
@@ -41,6 +42,10 @@ class Scanner:
 
 	def reportWarning(self, message):
 		print "WARNING: Line", self.curLine, "-",  message
+
+	def printInfo(self, message):
+		if self.verbose:
+			print message
 
 	def getToken(self):
 		'''Returns the next token'''
