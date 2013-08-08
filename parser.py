@@ -33,7 +33,7 @@ class SymbolTable:
 		token['type'] = aType.upper()
 		token['val'] = val
 		scope.append(token)
-		print token['text'] + " added to symbol table"
+		#print token['text'] + " added to symbol table"
 		self.printScope()
 		return True
 
@@ -46,22 +46,20 @@ class SymbolTable:
 		'''Procedures are a special case - added up one
 		layer so they are properly accessible. Parameters
 		are also added to them too.'''
-		print "Add procedure called!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 		procToken['parameters'] = self.table[-1]
 		procToken['type'] = 'PROCEDURE'
 		self.table[-2].append(procToken)
-		print self.table
 
 	def checkProcedure(self, procedureToken, arguments):
 		'''Checks whether or not the given procedure
 		call is in scope, and the arguments are correct.'''
-		print "checkProcedure called"
+		#print "checkProcedure called"
 		# Check if procedure is in scope
-		print self.table
+		#print self.table
 		if not self.getToken(procedureToken):
 			self.reportError("Undeclared procedure called")
 		# Check if arguments are correct
-		print self.getToken(procedureToken)
+		#print self.getToken(procedureToken)
 	
 	def getToken(self, token):
 		for item in self.gTable:
@@ -106,10 +104,10 @@ class SymbolTable:
 	def printScope(self):
 		'''Prints all tokens in the current scope. Used
 		for debugging'''
-		print "-------------------- Scope -----------------"
-		print self.table[-1]
-		print "Global:"
-		print self.gTable
+		#print "-------------------- Scope -----------------"
+		#print self.table[-1]
+		#print "Global:"
+		#print self.gTable
 
 class Parser:
 	def __init__(self, fileName):
@@ -135,17 +133,18 @@ class Parser:
 			return self.nToken
 
 	def stepToSemicolon(self):
-		print "Stepping to semicolon"
+		#print "Stepping to semicolon"
 		while self.nToken['text'] != ";":
 			self.nToken = self.s.getToken()
-			print self.nToken
+			#print self.nToken
 
 	def stepToken(self):
 		if self.resync:
-			print "Resyncing. Not stepping"
+			#print "Resyncing. Not stepping"
+			pass
 		else:
 			self.nToken = self.s.getToken()
-			print self.getnToken()
+			#print self.getnToken()
 
 
 	def parse(self):
@@ -157,7 +156,7 @@ class Parser:
 		print "Parsing complete.", self.errorCount, "error(s)."
 
 	def program_header(self):
-		print "\nEntering program_header\n"
+		#print "\nEntering program_header\n"
 		self.expectText("program", "\"program\" expected")
 		if not self.identifier():
 			self.reportError("Identifier expected after program")
@@ -165,7 +164,7 @@ class Parser:
 
 	def program_body(self):
 		self.symTable.push()
-		print "\nEntering program_body\n"
+		#print "\nEntering program_body\n"
 		# Check for declaration (can be 0-n)
 		while self.getnToken()['text'] != "begin":
 			self.declaration(True)
@@ -178,7 +177,7 @@ class Parser:
 		#		self.reportError("Statement expected between begin and end")
 		while self.statement():
 			self.expectText(";", "Semicolon expected after statement")
-		print "CHECKING FOR END"
+		#print "CHECKING FOR END"
 		self.expectText("end", "\"end\" expected after statements")
 		#self.stepToken()
 		self.expectText("program", "\"program\" expected after end")
@@ -186,7 +185,7 @@ class Parser:
 		return True
 
 	def declaration(self, cbGlobal):
-		print "\nEntering declaration\n"
+		#print "\nEntering declaration\n"
 		'''cbGlobal defines whether or not the declaration can be global or not.'''
 		isGlobal = False
 		if self.getnToken()['text'] == "global":
@@ -210,7 +209,7 @@ class Parser:
 		return headerResult and bodyResult
 
 	def procedure_header(self, isGlobal):
-		print "Entering procedure_header"
+		#print "Entering procedure_header"
 		if self.getnToken()['text'] == "procedure":
 			self.stepToken()
 			token = self.identifier()
@@ -238,7 +237,7 @@ class Parser:
 		return True
 
 	def parameter_list(self):
-		print "Entering parameter_list"
+		#print "Entering parameter_list"
 		if self.parameter():
 			if self.getnToken()['text'] == ",":
 				self.stepToken()
@@ -260,7 +259,7 @@ class Parser:
 		return False
 
 	def type_mark(self):
-		print "\nEntering type_mark\n"
+		#print "\nEntering type_mark\n"
 		token = self.getnToken()
 		if token['text'] in {"integer", "float", "bool", "string"}:
 			self.stepToken()
@@ -269,7 +268,7 @@ class Parser:
 			return False
 
 	def variable_declaration(self, isGlobal=False):
-		print "\nEntering variable_declaration\n"
+		#print "\nEntering variable_declaration\n"
 		aType = self.type_mark()
 		if aType:
 			aIdentifier = self.identifier()
@@ -305,7 +304,7 @@ class Parser:
 		return ( self.if_statement() or self.loop_statement() or self.return_statement() or self.ruleInt() )
 	
 	def assignment_statement1(self):
-		print "Entering assignment_statement"
+		#print "Entering assignment_statement"
 		if self.getnToken()['text'] == "[":
 			self.stepToken()
 			if self.expression():
@@ -321,7 +320,7 @@ class Parser:
 		elif self.getnToken()['text'] == ":=":
 			self.stepToken()
 			lType = self.expression()
-			print "assignment_statement1 =", lType
+			#print "assignment_statement1 =", lType
 			if lType:
 				return lType
 			else:
@@ -353,7 +352,7 @@ class Parser:
 				if rType:
 					return self.compatTypes(lType, rType)
 				else:
-					print "Expression =", lType
+					#print "Expression =", lType
 					return lType
 		return False
 
@@ -409,7 +408,7 @@ class Parser:
 		return False
 
 	def term(self):
-		print "Entering term"
+		#print "Entering term"
 		lType = self.factor()
 		if lType:
 			rType = self.term1()
@@ -492,11 +491,11 @@ class Parser:
 	def expCheckType(self, token):
 		if self.expressionType == False:
 			self.expressionType = self.symTable.getType(token)
-		print "Checking if " + str(token) + " is of type " + str(self.expressionType)
+		#print "Checking if " + str(token) + " is of type " + str(self.expressionType)
 		self.symTable.checkType(token, self.expressionType)
 
 	def if_statement(self):
-		print "Entering if_statement"
+		#print "Entering if_statement"
 		if self.getnToken()['text'] == "if":
 			self.stepToken()
 			self.expectText("(", "'(' expected after if in if statement")
@@ -514,11 +513,11 @@ class Parser:
 						self.stepToken()
 						while self.statement():
 							self.expectText(";", "Semi-colon expected after statement in if statement")
-					print "Looking for end in if statement"
+					#print "Looking for end in if statement"
 					self.expectText("end", "'end' expected in if statement")
 					self.expectText("if", "'if' expected after end in if statement")
 					return True
-					print "Completing if statement"
+					#print "Completing if statement"
 				else:
 					self.reportError("'then' expected after expression in if statement")
 			else:
@@ -533,7 +532,7 @@ class Parser:
 			if token:
 				lType = token['type']
 			rType = self.assignment_statement1()
-			print lType,rType
+			#print lType,rType
 			if lType == rType == 'INTEGER':
 				self.expectText(";", "semi-colon expected after assignment statement in for loop")
 				if self.expression():
@@ -574,7 +573,7 @@ class Parser:
 		if lType:
 			rType = self.argument_list1()
 			if rType:
-				print [lType] + rType
+				#print [lType] + rType
 				return [lType] + rType
 			else:
 				return [lType]
@@ -606,7 +605,7 @@ class Parser:
 			else:
 				rType = self.assignment_statement1()
 				if rType:
-					print "Checking assignment types"
+					#print "Checking assignment types"
 					return self.compatTypes(lType, rType)
 				else:
 					self.reportError("Assignment statement or procedure call with unknown character after identifier")
@@ -631,13 +630,13 @@ class Parser:
 		'''Checks for the specified text, otherwise throws an error, and returns 0'''
 		if self.resync and text == ";":
 			self.stepToSemicolon()
-			print self.nToken
+			#print self.nToken
 			self.resync = False
-			print "Completing sync to ;"
+			#print "Completing sync to ;"
 		if self.getnToken()['text'] != text:
 			if text == ";":
 				self.stepToSemicolon()
-				print self.nToken
+				#print self.nToken
 			else:
 				self.stepToken()
 			# Throw Error
@@ -661,7 +660,8 @@ class Parser:
 	def reportError(self, errorTxt):
 		if self.resync:
 			# Ignore error
-			print "Resyncing: Ignoring errors"
+			#print "Resyncing: Ignoring errors"
+			pass
 		else:
 			self.errorCount += 1
 			self.resync = True
@@ -677,14 +677,14 @@ class Parser:
 			if lType and rType in {'BOOL', 'INTEGER'}:
 				return 'BOOL'
 		elif lType == rType:
-			print lType, "==", rType
+			#print lType, "==", rType
 			combinedType = lType
 			return combinedType
 		elif caller == 'ARITH':
 			if lType and rType in {'INTEGER', 'FLOAT'}:
 				return 'INTEGER'
 		else:
-			traceback.print_stack()
-			print lType, "!=", rType
+			#traceback.print_stack()
+			#print lType, "!=", rType
 			self.reportError("Incompatible types.")
 			return False
